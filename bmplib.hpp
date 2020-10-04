@@ -172,11 +172,9 @@ public:
 		pixelBuf.bytes[y * w * 4 + x * 4 + 3] = 0;
 	}
 	inline void saveToFile(const char* filename) {
-		std::ofstream out(filename);
+		std::ofstream out(filename, std::ios::out | std::ios::binary);
 		byteArray sourceFile = fullFile();
-		for (int i = 0; i < sourceFile.size; i++) {
-			out << sourceFile.bytes[i];
-		}
+		out.write(sourceFile.bytes, sourceFile.size);
 		out.close();
 	}
 };
