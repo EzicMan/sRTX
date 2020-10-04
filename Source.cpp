@@ -129,7 +129,7 @@ int main() {
 		y++;
 	}
 	bitMapImage im(x, y);
-	double ekrY = sqrt(static_cast<double>(x * x) / (2 * (1 - cos(fov))) - static_cast<double>(x * x) / 4);
+	double ekrY = sqrt(static_cast<double>(x * x) / (2 * (1 - cos(fov / 180 * PI))) - static_cast<double>(x * x) / 4);
 	yl = ekrY - 200;
 	objs.push_back(new Sphere(-800, ekrY + 100, 0, 200));
 	objs.push_back(new Sphere(-400, ekrY - 32.5, 0, 75, Color(0,0,255)));
@@ -146,6 +146,7 @@ int main() {
 				double yx;
 				bool isKas;
 				if (o->intersect(j, ekrY, i, 0, 0, 0, yx, isKas)) {
+
 					if (yx > depthNow) {
 						continue;
 					}
