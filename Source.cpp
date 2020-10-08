@@ -29,8 +29,30 @@ public:
 		ans += x * r.x + y * r.y + z * r.z;
 		return ans;
 	}
-	double length() {
+	double length() const{
 		return x * x + y * y + z * z;
+	}
+	bool operator>(const Vector3& r) {
+		if (length() > r.length()) {
+			return true;
+		}
+		return false;
+	}
+	friend Vector3& maxv(Vector3& l, Vector3& r) {
+		if (l > r) {
+			return l;
+		}
+		else {
+			return r;
+		}
+	}
+	friend Vector3& minv(Vector3& l, Vector3& r) {
+		if (l > r) {
+			return r;
+		}
+		else {
+			return l;
+		}
 	}
 };
 
@@ -111,6 +133,49 @@ public:
 	}
 };
 
+class Polygon : public Object {
+	double x1, y1, z1;
+	double x2, y2, z2;
+public:
+	Polygon(double x0, double y0, double z0, double x1, double y1, double z1, double x2, double y2, double z2, Color col = Color(255, 0, 0)) {
+		this->x0 = x0;
+		this->y0 = y0;
+		this->z0 = z0;
+		this->x1 = x1;
+		this->y1 = y1;
+		this->z1 = z1;
+		this->x2 = x2;
+		this->y2 = y2;
+		this->z2 = z2;
+		this->col = col;
+	}
+	bool intersect(double A, double B, double C, double xc, double yc, double zc, double& ans, bool& isKas) override {
+		double Ap = (y1 - y0) * (z2 - z0) - (z1 - z0) * (y2 - y0);
+		double Bp = (z1 - z0) * (x2 - x0) - (x1 - x0) * (z2 - z0);
+		double Cp = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
+		double Dp = A * x0 + B * y0 + C * z0;
+		double yo = (yc * (A * Ap / B + Bp + C * Cp / B) - xc * Ap - zc * Cp - Dp) / (A * Ap / B + Bp + C * Cp / B);
+		double xo = (yo - yc) * A / B + xc;
+		double zo = (yo - yc) * C / B + zc;
+		Vector3 Ao(xo - x0, yo - y0, zo - z0);
+		Vector3 Bo(xo - x1, yo - y1, zo - z1);
+		Vector3 Co(xo - x2, yo - y2, zo - z2);
+		Vector3 ma = maxv(Ao, maxv(Bo, Co));
+		Vector3 mi = minv(Ao, minv(Bo, Co));
+		if (ma * mi > 0) {
+			ans = 0;
+			isKas = false;
+			return false;
+		}
+		ans = yo;
+		isKas = false;
+		return true;
+	}
+	Color pixelColor(double x, double y, double z) override {
+		return col;
+	}
+};
+
 bool sortO(Object* a, Object* b) {
 	return a->y0 > b->y0;
 }
@@ -134,6 +199,7 @@ int main() {
 	objs.push_back(new Sphere(-800, ekrY + 100, 0, 200));
 	objs.push_back(new Sphere(-400, ekrY - 32.5, 0, 75, Color(0,0,255)));
 	objs.push_back(new Sphere(400, ekrY - 300, 0, 75, Color(0,255,0)));
+	//objs.push_back(new Polygon(-20.0,ekrY*2,-30.0, -20.0, ekrY * 2, 40.0, 100.0, ekrY * 2, 40.0, Color(255,0,0)));
 
 	sort(objs.begin(), objs.end(), sortO);
 	std::vector<std::vector<double>> depthBuffer(y, std::vector<double>(x, std::numeric_limits<double>::infinity()));
