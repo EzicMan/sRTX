@@ -18,16 +18,20 @@ public:
 		this->y = y;
 		this->z = z;
 	}
-	void normalize() {
+	Vector3 normalize() {
 		double r = sqrt(x * x + y * y + z * z);
-		x /= r;
-		y /= r;
-		z /= r;
+		return Vector3(x / r, y / r, z / r);
 	}
 	double operator*(const Vector3& r) {
 		double ans = 0;
 		ans += x * r.x + y * r.y + z * r.z;
 		return ans;
+	}
+	Vector3 operator-(const Vector3& r) {
+		return Vector3(x - r.x,y - r.y,z - r.z);
+	}
+	Vector3 operator+(const Vector3& r) {
+		return Vector3(x + r.x, y + r.y, z + r.z);
 	}
 	double length() const{
 		return x * x + y * y + z * z;
@@ -37,6 +41,16 @@ public:
 			return true;
 		}
 		return false;
+	}
+	Vector3 crossProduct(Vector3 b) {
+		Vector3 c;
+		c.x = y * b.z - z * b.y;
+		c.y = z * b.x - x * b.z;
+		c.z = x * b.y - y * b.x;
+		return c;
+	}
+	Vector3 operator-() {
+		return Vector3(-x, -y, -z);
 	}
 	friend Vector3& maxv(Vector3& l, Vector3& r) {
 		if (l > r) {
@@ -98,9 +112,9 @@ public:
 	}
 	Color pixelColor(double x, double y, double z) override {
 		Vector3 n(2 * (x - x0), 2 * (y - y0), 2 * (z - z0));
-		n.normalize();
+		n = n.normalize();
 		Vector3 a(xl - x, yl - y, zl - z);
-		a.normalize();
+		a = a.normalize();
 		bool closed = false;
 		double yt = 0;
 		bool isKast = false;
@@ -136,6 +150,7 @@ public:
 class Polygon : public Object {
 	double x1, y1, z1;
 	double x2, y2, z2;
+	double Ap, Bp, Cp, Dp;
 public:
 	Polygon(double x0, double y0, double z0, double x1, double y1, double z1, double x2, double y2, double z2, Color col = Color(255, 0, 0)) {
 		this->x0 = x0;
@@ -148,21 +163,23 @@ public:
 		this->y2 = y2;
 		this->z2 = z2;
 		this->col = col;
+		Ap = (y1 - y0) * (z2 - z0) - (z1 - z0) * (y2 - y0);
+		Bp = (z1 - z0) * (x2 - x0) - (x1 - x0) * (z2 - z0);
+		Cp = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
+		Dp = -Ap * x0 - Bp * y0 - Cp * z0;
 	}
 	bool intersect(double A, double B, double C, double xc, double yc, double zc, double& ans, bool& isKas) override {
-		double Ap = (y1 - y0) * (z2 - z0) - (z1 - z0) * (y2 - y0);
-		double Bp = (z1 - z0) * (x2 - x0) - (x1 - x0) * (z2 - z0);
-		double Cp = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
-		double Dp = A * x0 + B * y0 + C * z0;
 		double yo = (yc * (A * Ap / B + Bp + C * Cp / B) - xc * Ap - zc * Cp - Dp) / (A * Ap / B + Bp + C * Cp / B);
 		double xo = (yo - yc) * A / B + xc;
 		double zo = (yo - yc) * C / B + zc;
-		Vector3 Ao(xo - x0, yo - y0, zo - z0);
-		Vector3 Bo(xo - x1, yo - y1, zo - z1);
-		Vector3 Co(xo - x2, yo - y2, zo - z2);
-		Vector3 ma = maxv(Ao, maxv(Bo, Co));
-		Vector3 mi = minv(Ao, minv(Bo, Co));
-		if (ma * mi > 0) {
+		Vector3 o(xo, yo, zo);
+		Vector3 a(x0, y0, z0);
+		Vector3 b(x1, y1, z1);
+		Vector3 c(x2, y2, z2);
+		Vector3 n1 = (o - a).crossProduct(b - a);
+		Vector3 n2 = (o - b).crossProduct(c - b);
+		Vector3 n3 = (o - c).crossProduct(a - c);
+		if (n1 * n2 < 0 || n1 * n3 < 0 || n2 * n3 < 0) {
 			ans = 0;
 			isKas = false;
 			return false;
@@ -172,7 +189,42 @@ public:
 		return true;
 	}
 	Color pixelColor(double x, double y, double z) override {
-		return col;
+		Vector3 n(Ap, Bp, Cp);
+		n = n.normalize();
+		Vector3 a(xl - x, yl - y, zl - z);
+		if (a * n < 0) {
+			n = -n;
+		}
+		a = a.normalize();
+		bool closed = false;
+		double yt = 0;
+		bool isKast = false;
+		intersect(-a.x, -a.y, -a.z, xl, yl, zl, yt, isKast);
+		Vector3 curs(yt * a.x / a.y, yt, yt * a.z / a.y);
+		for (auto o : objs) {
+			double yx;
+			bool isKas;
+			if (o != this && o->intersect(-a.x, -a.y, -a.z, xl, yl, zl, yx, isKas)) {
+				Vector3 cur(yx * a.x / a.y, yx, yx * a.z / a.y);
+				if (curs.length() > cur.length() && cur * curs > 0) {
+					closed = true;
+					count1++;
+					break;
+				}
+			}
+		}
+		Color c = col;
+		double osv = n * a;
+		if (osv < 0) {
+			osv = 0;
+		}
+		if (closed) {
+			osv = 0;
+		}
+		c.red = static_cast<int>(min(c.red * osv + 10, 255.0));
+		c.green = static_cast<int>(min(c.green * osv + 10, 255.0));
+		c.blue = static_cast<int>(min(c.blue * osv + 10, 255.0));
+		return c;
 	}
 };
 
@@ -199,7 +251,8 @@ int main() {
 	objs.push_back(new Sphere(-800, ekrY + 100, 0, 200));
 	objs.push_back(new Sphere(-400, ekrY - 32.5, 0, 75, Color(0,0,255)));
 	objs.push_back(new Sphere(400, ekrY - 300, 0, 75, Color(0,255,0)));
-	//objs.push_back(new Polygon(-20.0,ekrY*2,-30.0, -20.0, ekrY * 2, 40.0, 100.0, ekrY * 2, 40.0, Color(255,0,0)));
+	objs.push_back(new Polygon(-200.0,ekrY*2 + 500,-100.0, -300.0, ekrY * 2 + 800, 400.0, 100.0, ekrY * 2 + 800, 400.0, Color(255,0,0)));
+	objs.push_back(new Polygon(-200.0,ekrY*2 + 500,0.0, -300.0, ekrY * 2 + 800, 700.0, 100.0, ekrY * 2 + 800, 700.0, Color(255,0,0)));
 
 	sort(objs.begin(), objs.end(), sortO);
 	std::vector<std::vector<double>> depthBuffer(y, std::vector<double>(x, std::numeric_limits<double>::infinity()));
