@@ -27,6 +27,10 @@ public:
 		ans += x * r.x + y * r.y + z * r.z;
 		return ans;
 	}
+	Vector3 operator*(const double a) {
+		Vector3 ans(x * a,y * a,z * a);
+		return ans;
+	}
 	Vector3 operator-(const Vector3& r) {
 		return Vector3(x - r.x,y - r.y,z - r.z);
 	}
@@ -78,6 +82,26 @@ public:
 	virtual bool intersect(double, double, double, double, double, double, double&, bool&) = 0;
 	virtual Color pixelColor(double, double, double) = 0;
 	friend bool sortO(Object*, Object*);
+	Color specularCount(Vector3& n, Vector3& a, Vector3 cur, double specCoef, double& osv, bool& closed) {
+		Vector3 glyanec = (n * (n * a)) * 2 - a;
+		glyanec = glyanec.normalize();
+		cur = cur.normalize();
+		double diff = -(glyanec * cur);
+		if (diff < 0) {
+			diff = 0;
+		}
+		diff = powf(diff, specCoef);
+		if (osv < 0) {
+			osv = 0;
+			diff = 0;
+		}
+		if (closed) {
+			osv = 0;
+			diff = 0;
+		}
+		Color spec = Color(255 * diff, 255 * diff, 255 * diff);
+		return spec;
+	}
 };
 
 vector<Object*> objs;
@@ -134,15 +158,23 @@ public:
 		}
 		Color c = col;
 		double osv = n * a;
+		/*cout << glyanec.length() << endl;
+		cout << a.length() << endl;
+		cout << n.length() << endl;*/
 		if (osv < 0) {
 			osv = 0;
 		}
 		if (closed) {
 			osv = 0;
 		}
-		c.red = static_cast<int>(min(c.red * osv + 10,255.0));
-		c.green = static_cast<int>(min(c.green * osv + 10, 255.0));
-		c.blue = static_cast<int>(min(c.blue * osv + 10, 255.0));
+		c.red = static_cast<int>(min(10 + c.red * osv,255.0));
+		c.green = static_cast<int>(min(10 + c.green * osv, 255.0));
+		c.blue = static_cast<int>(min(10 + c.blue * osv, 255.0));
+		//c = Color(0, 0, 0);
+		Color spec = specularCount(n, a, Vector3(x, y, z), 5, osv, closed);
+		c.red = static_cast<int>(min(c.red + spec.red, 255));
+		c.green = static_cast<int>(min(c.green + spec.green, 255));
+		c.blue = static_cast<int>(min(c.blue + spec.blue, 255));
 		return c;
 	}
 };
@@ -221,9 +253,16 @@ public:
 		if (closed) {
 			osv = 0;
 		}
+		if (a * Vector3(-x, -y, -z) < 0) {
+			osv = 0;
+		}
 		c.red = static_cast<int>(min(c.red * osv + 10, 255.0));
 		c.green = static_cast<int>(min(c.green * osv + 10, 255.0));
 		c.blue = static_cast<int>(min(c.blue * osv + 10, 255.0));
+		Color spec = specularCount(n, a, Vector3(x, y, z), 5, osv, closed);
+		c.red = static_cast<int>(min(c.red + spec.red, 255));
+		c.green = static_cast<int>(min(c.green + spec.green, 255));
+		c.blue = static_cast<int>(min(c.blue + spec.blue, 255));
 		return c;
 	}
 };
@@ -245,14 +284,14 @@ int main() {
 	if (y % 2 != 0) {
 		y++;
 	}
-	bitMapImage im(x, y);
+	bitMapImage<24> im(x, y);
 	double ekrY = sqrt(static_cast<double>(x * x) / (2 * (1 - cos(fov / 180 * PI))) - static_cast<double>(x * x) / 4);
 	yl = ekrY - 200;
 	objs.push_back(new Sphere(-800, ekrY + 100, 0, 200));
 	objs.push_back(new Sphere(-400, ekrY - 32.5, 0, 75, Color(0,0,255)));
 	objs.push_back(new Sphere(400, ekrY - 300, 0, 75, Color(0,255,0)));
-	objs.push_back(new Polygon(-200.0,ekrY*2 + 500,-100.0, -300.0, ekrY * 2 + 800, 400.0, 100.0, ekrY * 2 + 800, 400.0, Color(255,0,0)));
-	objs.push_back(new Polygon(-200.0,ekrY*2 + 500,0.0, -300.0, ekrY * 2 + 800, 700.0, 100.0, ekrY * 2 + 800, 700.0, Color(255,0,0)));
+	//objs.push_back(new Polygon(-200.0,ekrY + 400,-100.0, -300.0, ekrY + 400, 400.0, 100.0, ekrY + 400, 400.0, Color(255,0,0)));
+	//objs.push_back(new Polygon(-200.0,ekrY + 10,0.0, -300.0, ekrY * 2 + 800, 700.0, 100.0, ekrY * 2 + 800, 700.0, Color(255,0,0)));
 
 	sort(objs.begin(), objs.end(), sortO);
 	std::vector<std::vector<double>> depthBuffer(y, std::vector<double>(x, std::numeric_limits<double>::infinity()));
