@@ -74,69 +74,22 @@ public:
 	}
 };
 
-class Object {
-protected:
-	double x0, y0, z0;
-public:
-	Color col;
-	virtual bool intersect(double, double, double, double, double, double, double&, bool&) = 0;
-	virtual Color pixelColor(double, double, double) = 0;
-	friend bool sortO(Object*, Object*);
-	Color specularCount(Vector3& n, Vector3& a, Vector3 cur, double specCoef, double& osv, bool& closed) {
-		Vector3 glyanec = (n * (n * a)) * 2 - a;
-		glyanec = glyanec.normalize();
-		cur = cur.normalize();
-		double diff = -(glyanec * cur);
-		if (diff < 0) {
-			diff = 0;
-		}
-		diff = powf(diff, specCoef);
-		if (osv < 0) {
-			osv = 0;
-			diff = 0;
-		}
-		if (closed) {
-			osv = 0;
-			diff = 0;
-		}
-		Color spec = Color(255 * diff, 255 * diff, 255 * diff);
-		return spec;
-	}
-};
+class Object;
 
 vector<Object*> objs;
 
-class Sphere : public Object {
-	double R;
+constexpr double gamma = 2.2;
+constexpr double ambientLight = 0.00004;
+
+class Object {
+protected:
+	double x0, y0, z0;
+	double specularity;
 public:
-	Sphere(double x0, double y0, double z0, double R, Color col = Color(255,0,0)) {
-		this->x0 = x0;
-		this->y0 = y0;
-		this->z0 = z0;
-		this->R = R;
-		this->col = col;
-	}
-	bool intersect(double A, double B, double C, double xc, double yc, double zc, double& ans, bool& isKas) override {
-		double d1 = ((x0-xc) * A / B + (y0-yc) + (z0-zc) * C / B) * ((x0-xc) * A / B + (y0-yc) + (z0-zc) * C / B) - (A * A / (B * B) + 1 + C * C / (B * B)) * ((x0-xc) * (x0-xc) + (y0-yc) * (y0-yc) + (z0-zc) * (z0-zc) - R * R);
-		if (d1 >= 0) {
-			double y1 = (((x0-xc) * A / B + (y0-yc) + (z0-zc) * C / B) + sqrt(d1)) / (A * A / (B * B) + 1 + C * C / (B * B));
-			double y2 = (((x0-xc) * A / B + (y0-yc) + (z0-zc) * C / B) - sqrt(d1)) / (A * A / (B * B) + 1 + C * C / (B * B));
-			if (d1 == 0) {
-				isKas = true;
-			}
-			else {
-				isKas = false;
-			}
-			ans = min(y1, y2);
-			return true;
-		}
-		ans = 0;
-		isKas = 0;
-		return false;
-	}
-	Color pixelColor(double x, double y, double z) override {
-		Vector3 n(2 * (x - x0), 2 * (y - y0), 2 * (z - z0));
-		n = n.normalize();
+	Color col;
+	virtual bool intersect(double, double, double, double, double, double, double&, bool&) = 0;
+	virtual Color pixelColorCustoms(double, double, double) = 0;
+	Color pixelColor(double x, double y, double z, Vector3 n) {
 		Vector3 a(xl - x, yl - y, zl - z);
 		a = a.normalize();
 		bool closed = false;
@@ -156,26 +109,89 @@ public:
 				}
 			}
 		}
-		Color c = col;
+		Color theREDACTED = col;
 		double osv = n * a;
-		/*cout << glyanec.length() << endl;
-		cout << a.length() << endl;
-		cout << n.length() << endl;*/
 		if (osv < 0) {
 			osv = 0;
 		}
 		if (closed) {
 			osv = 0;
 		}
-		c.red = static_cast<int>(min(10 + c.red * osv,255.0));
-		c.green = static_cast<int>(min(10 + c.green * osv, 255.0));
-		c.blue = static_cast<int>(min(10 + c.blue * osv, 255.0));
-		//c = Color(0, 0, 0);
-		Color spec = specularCount(n, a, Vector3(x, y, z), 5, osv, closed);
-		c.red = static_cast<int>(min(c.red + spec.red, 255));
-		c.green = static_cast<int>(min(c.green + spec.green, 255));
-		c.blue = static_cast<int>(min(c.blue + spec.blue, 255));
-		return c;
+		if (a * Vector3(-x, -y, -z) < 0) {
+			osv = 0;
+		}
+		Vector3 c((double)theREDACTED.red / 255, (double)theREDACTED.green / 255, (double)theREDACTED.blue / 255);
+		c.x = pow(c.x, gamma);
+		c.y = pow(c.y, gamma);
+		c.z = pow(c.z, gamma);
+		c.x = ambientLight + c.x * osv;
+		c.y = ambientLight + c.y * osv;
+		c.z = ambientLight + c.z * osv;
+		Vector3 spec = specularCount(n, a, Vector3(x, y, z), specularity, osv, closed);
+		c = c + spec;
+		c.x = pow(c.x, 1.0/gamma);
+		c.y = pow(c.y, 1.0/gamma);
+		c.z = pow(c.z, 1.0/gamma);
+		theREDACTED.red = (int)min(c.x * 255,255.0);
+		theREDACTED.green = (int)min(c.y * 255, 255.0);
+		theREDACTED.blue = (int)min(c.z * 255, 255.0);
+		return theREDACTED;
+	}
+	friend bool sortO(Object*, Object*);
+	Vector3 specularCount(Vector3& n, Vector3& a, Vector3 cur, double specCoef, double& osv, bool& closed) {
+		Vector3 glyanec = (n * (n * a)) * 2 - a;
+		glyanec = glyanec.normalize();
+		cur = cur.normalize();
+		double diff = -(glyanec * cur);
+		if (diff < 0) {
+			diff = 0;
+		}
+		diff = pow(diff, specCoef);
+		if (osv < 0) {
+			osv = 0;
+			diff = 0;
+		}
+		if (closed) {
+			osv = 0;
+			diff = 0;
+		}
+		return Vector3(diff, diff, diff);
+	}
+};
+
+class Sphere : public Object {
+	double R;
+public:
+	Sphere(double x0, double y0, double z0, double R, Color col = Color(255,0,0), double spec = 5) {
+		this->x0 = x0;
+		this->y0 = y0;
+		this->z0 = z0;
+		this->R = R;
+		this->col = col;
+		this->specularity = spec;
+	}
+	bool intersect(double A, double B, double C, double xc, double yc, double zc, double& ans, bool& isKas) override {
+		double d1 = ((x0-xc) * A / B + (y0-yc) + (z0-zc) * C / B) * ((x0-xc) * A / B + (y0-yc) + (z0-zc) * C / B) - (A * A / (B * B) + 1 + C * C / (B * B)) * ((x0-xc) * (x0-xc) + (y0-yc) * (y0-yc) + (z0-zc) * (z0-zc) - R * R);
+		if (d1 >= 0) {
+			double y1 = (((x0-xc) * A / B + (y0-yc) + (z0-zc) * C / B) + sqrt(d1)) / (A * A / (B * B) + 1 + C * C / (B * B));
+			double y2 = (((x0-xc) * A / B + (y0-yc) + (z0-zc) * C / B) - sqrt(d1)) / (A * A / (B * B) + 1 + C * C / (B * B));
+			if (d1 == 0) {
+				isKas = true;
+			}
+			else {
+				isKas = false;
+			}
+			ans = min(y1, y2);
+			return true;
+		}
+		ans = 0;
+		isKas = 0;
+		return false;
+	}
+	Color pixelColorCustoms(double x, double y, double z) override {
+		Vector3 n(2 * (x - x0), 2 * (y - y0), 2 * (z - z0));
+		n = n.normalize();
+		return pixelColor(x, y, z, n);
 	}
 };
 
@@ -184,7 +200,7 @@ class Polygon : public Object {
 	double x2, y2, z2;
 	double Ap, Bp, Cp, Dp;
 public:
-	Polygon(double x0, double y0, double z0, double x1, double y1, double z1, double x2, double y2, double z2, Color col = Color(255, 0, 0)) {
+	Polygon(double x0, double y0, double z0, double x1, double y1, double z1, double x2, double y2, double z2, Color col = Color(255, 0, 0), double spec = 5) {
 		this->x0 = x0;
 		this->y0 = y0;
 		this->z0 = z0;
@@ -199,6 +215,7 @@ public:
 		Bp = (z1 - z0) * (x2 - x0) - (x1 - x0) * (z2 - z0);
 		Cp = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
 		Dp = -Ap * x0 - Bp * y0 - Cp * z0;
+		this->specularity = spec;
 	}
 	bool intersect(double A, double B, double C, double xc, double yc, double zc, double& ans, bool& isKas) override {
 		double yo = (yc * (A * Ap / B + Bp + C * Cp / B) - xc * Ap - zc * Cp - Dp) / (A * Ap / B + Bp + C * Cp / B);
@@ -220,50 +237,14 @@ public:
 		isKas = false;
 		return true;
 	}
-	Color pixelColor(double x, double y, double z) override {
+	Color pixelColorCustoms(double x, double y, double z) override {
 		Vector3 n(Ap, Bp, Cp);
 		n = n.normalize();
 		Vector3 a(xl - x, yl - y, zl - z);
 		if (a * n < 0) {
 			n = -n;
 		}
-		a = a.normalize();
-		bool closed = false;
-		double yt = 0;
-		bool isKast = false;
-		intersect(-a.x, -a.y, -a.z, xl, yl, zl, yt, isKast);
-		Vector3 curs(yt * a.x / a.y, yt, yt * a.z / a.y);
-		for (auto o : objs) {
-			double yx;
-			bool isKas;
-			if (o != this && o->intersect(-a.x, -a.y, -a.z, xl, yl, zl, yx, isKas)) {
-				Vector3 cur(yx * a.x / a.y, yx, yx * a.z / a.y);
-				if (curs.length() > cur.length() && cur * curs > 0) {
-					closed = true;
-					count1++;
-					break;
-				}
-			}
-		}
-		Color c = col;
-		double osv = n * a;
-		if (osv < 0) {
-			osv = 0;
-		}
-		if (closed) {
-			osv = 0;
-		}
-		if (a * Vector3(-x, -y, -z) < 0) {
-			osv = 0;
-		}
-		c.red = static_cast<int>(min(c.red * osv + 10, 255.0));
-		c.green = static_cast<int>(min(c.green * osv + 10, 255.0));
-		c.blue = static_cast<int>(min(c.blue * osv + 10, 255.0));
-		Color spec = specularCount(n, a, Vector3(x, y, z), 5, osv, closed);
-		c.red = static_cast<int>(min(c.red + spec.red, 255));
-		c.green = static_cast<int>(min(c.green + spec.green, 255));
-		c.blue = static_cast<int>(min(c.blue + spec.blue, 255));
-		return c;
+		return pixelColor(x, y, z, n);
 	}
 };
 
@@ -285,13 +266,13 @@ int main() {
 		y++;
 	}
 	bitMapImage<24> im(x, y);
-	double ekrY = sqrt(static_cast<double>(x * x) / (2 * (1 - cos(fov / 180 * PI))) - static_cast<double>(x * x) / 4);
+	double ekrY = sqrt(static_cast<double>((double)x * (double)x) / (2 * (1 - cos(fov / 180 * PI))) - static_cast<double>((double)x * (double)x) / 4);
 	yl = ekrY - 200;
-	objs.push_back(new Sphere(-800, ekrY + 100, 0, 200));
-	objs.push_back(new Sphere(-400, ekrY - 32.5, 0, 75, Color(0,0,255)));
-	objs.push_back(new Sphere(400, ekrY - 300, 0, 75, Color(0,255,0)));
-	//objs.push_back(new Polygon(-200.0,ekrY + 400,-100.0, -300.0, ekrY + 400, 400.0, 100.0, ekrY + 400, 400.0, Color(255,0,0)));
-	//objs.push_back(new Polygon(-200.0,ekrY + 10,0.0, -300.0, ekrY * 2 + 800, 700.0, 100.0, ekrY * 2 + 800, 700.0, Color(255,0,0)));
+	objs.push_back(new Sphere(-800, ekrY + 100, 0, 200,Color(255),10));
+	objs.push_back(new Sphere(-400, ekrY - 32.5, 0, 75, Color(0,0,255),10));
+	objs.push_back(new Sphere(400, ekrY - 300, 0, 75, Color(0,255,0),10));
+	objs.push_back(new Polygon(-200.0,ekrY + 400,-100.0, -300.0, ekrY + 400, 400.0, 100.0, ekrY + 400, 400.0, Color(255,0,0),10));
+	objs.push_back(new Polygon(-200.0,ekrY + 10,0.0, -300.0, ekrY * 2 + 800, 700.0, 100.0, ekrY * 2 + 800, 700.0, Color(255,0,0),10));
 
 	sort(objs.begin(), objs.end(), sortO);
 	std::vector<std::vector<double>> depthBuffer(y, std::vector<double>(x, std::numeric_limits<double>::infinity()));
@@ -311,7 +292,7 @@ int main() {
 
 					depthNow = yx;
 
-					Color c = o->pixelColor(static_cast<double>(j) * yx / ekrY, yx, static_cast<double>(i) * yx / ekrY);
+					Color c = o->pixelColorCustoms(static_cast<double>(j) * yx / ekrY, yx, static_cast<double>(i) * yx / ekrY);
 					im.setPixel(x / 2 + j, y / 2 + i, c);
 					pixelSet = true;
 				}
