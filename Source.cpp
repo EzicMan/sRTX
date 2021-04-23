@@ -3,161 +3,12 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include "Vector3.hpp"
+#include "kdTree.hpp"
+#include "Object.hpp"
 using namespace std;
 
 #define PI 3.1415926
-
-double xl = 0, yl = 0, zl = 0;
-long long count1 = 0;
-
-class Vector3 {
-public:
-	double x, y, z;
-	Vector3(double x = 0, double y = 0, double z = 0) {
-		this->x = x;
-		this->y = y;
-		this->z = z;
-	}
-	Vector3 normalize() {
-		double r = sqrt(x * x + y * y + z * z);
-		return Vector3(x / r, y / r, z / r);
-	}
-	double operator*(const Vector3& r) {
-		double ans = 0;
-		ans += x * r.x + y * r.y + z * r.z;
-		return ans;
-	}
-	Vector3 operator*(const double a) {
-		Vector3 ans(x * a,y * a,z * a);
-		return ans;
-	}
-	Vector3 operator-(const Vector3& r) {
-		return Vector3(x - r.x,y - r.y,z - r.z);
-	}
-	Vector3 operator+(const Vector3& r) {
-		return Vector3(x + r.x, y + r.y, z + r.z);
-	}
-	double length() const{
-		return x * x + y * y + z * z;
-	}
-	bool operator>(const Vector3& r) {
-		if (length() > r.length()) {
-			return true;
-		}
-		return false;
-	}
-	Vector3 crossProduct(Vector3 b) {
-		Vector3 c;
-		c.x = y * b.z - z * b.y;
-		c.y = z * b.x - x * b.z;
-		c.z = x * b.y - y * b.x;
-		return c;
-	}
-	Vector3 operator-() {
-		return Vector3(-x, -y, -z);
-	}
-	friend Vector3& maxv(Vector3& l, Vector3& r) {
-		if (l > r) {
-			return l;
-		}
-		else {
-			return r;
-		}
-	}
-	friend Vector3& minv(Vector3& l, Vector3& r) {
-		if (l > r) {
-			return r;
-		}
-		else {
-			return l;
-		}
-	}
-};
-
-class Object;
-
-vector<Object*> objs;
-
-constexpr double gamma = 2.2;
-constexpr double ambientLight = 0.00004;
-
-class Object {
-protected:
-	double x0, y0, z0;
-	double specularity;
-public:
-	Color col;
-	virtual bool intersect(double, double, double, double, double, double, double&, bool&) = 0;
-	virtual Color pixelColorCustoms(double, double, double) = 0;
-	Color pixelColor(double x, double y, double z, Vector3 n) {
-		Vector3 a(xl - x, yl - y, zl - z);
-		a = a.normalize();
-		bool closed = false;
-		double yt = 0;
-		bool isKast = false;
-		intersect(-a.x, -a.y, -a.z, xl, yl, zl, yt, isKast);
-		Vector3 curs(yt * a.x / a.y, yt, yt * a.z / a.y);
-		for (auto o : objs) {
-			double yx;
-			bool isKas;
-			if (o != this && o->intersect(-a.x, -a.y, -a.z, xl, yl, zl, yx, isKas)) {
-				Vector3 cur(yx * a.x / a.y, yx, yx * a.z / a.y);
-				if (curs.length() > cur.length() && cur * curs > 0) {
-					closed = true;
-					count1++;
-					break;
-				}
-			}
-		}
-		Color theREDACTED = col;
-		double osv = n * a;
-		if (osv < 0) {
-			osv = 0;
-		}
-		if (closed) {
-			osv = 0;
-		}
-		if (a * Vector3(-x, -y, -z) < 0) {
-			osv = 0;
-		}
-		Vector3 c((double)theREDACTED.red / 255, (double)theREDACTED.green / 255, (double)theREDACTED.blue / 255);
-		c.x = pow(c.x, gamma);
-		c.y = pow(c.y, gamma);
-		c.z = pow(c.z, gamma);
-		c.x = ambientLight + c.x * osv;
-		c.y = ambientLight + c.y * osv;
-		c.z = ambientLight + c.z * osv;
-		Vector3 spec = specularCount(n, a, Vector3(x, y, z), specularity, osv, closed);
-		c = c + spec;
-		c.x = pow(c.x, 1.0/gamma);
-		c.y = pow(c.y, 1.0/gamma);
-		c.z = pow(c.z, 1.0/gamma);
-		theREDACTED.red = (int)min(c.x * 255,255.0);
-		theREDACTED.green = (int)min(c.y * 255, 255.0);
-		theREDACTED.blue = (int)min(c.z * 255, 255.0);
-		return theREDACTED;
-	}
-	friend bool sortO(Object*, Object*);
-	Vector3 specularCount(Vector3& n, Vector3& a, Vector3 cur, double specCoef, double& osv, bool& closed) {
-		Vector3 glyanec = (n * (n * a)) * 2 - a;
-		glyanec = glyanec.normalize();
-		cur = cur.normalize();
-		double diff = -(glyanec * cur);
-		if (diff < 0) {
-			diff = 0;
-		}
-		diff = pow(diff, specCoef);
-		if (osv < 0) {
-			osv = 0;
-			diff = 0;
-		}
-		if (closed) {
-			osv = 0;
-			diff = 0;
-		}
-		return Vector3(diff, diff, diff);
-	}
-};
 
 class Sphere : public Object {
 	double R;
@@ -185,13 +36,21 @@ public:
 			return true;
 		}
 		ans = 0;
-		isKas = 0;
+		isKas = false;
 		return false;
 	}
 	Color pixelColorCustoms(double x, double y, double z) override {
 		Vector3 n(2 * (x - x0), 2 * (y - y0), 2 * (z - z0));
 		n = n.normalize();
 		return pixelColor(x, y, z, n);
+	}
+	void updateBoundingBox() override {
+	    bbox[0].x = x0 - R;
+        bbox[0].y = y0 - R;
+        bbox[0].z = z0 - R;
+        bbox[1].x = x0 + R;
+        bbox[1].y = y0 + R;
+        bbox[1].z = z0 + R;
 	}
 };
 
@@ -246,6 +105,15 @@ public:
 		}
 		return pixelColor(x, y, z, n);
 	}
+
+    void updateBoundingBox() override {
+        bbox[0].x = std::min(std::min(x0, x1), x2);
+        bbox[0].y = std::min(std::min(y0, y1), y2);
+        bbox[0].z = std::min(std::min(z0, z1), z2);
+        bbox[1].x = std::max(std::max(x0, x1), x2);
+        bbox[1].y = std::max(std::max(y0, y1), y2);
+        bbox[1].z = std::max(std::max(z0, z1), z2);
+    }
 };
 
 bool sortO(Object* a, Object* b) {

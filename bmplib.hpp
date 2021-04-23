@@ -1,6 +1,7 @@
 #pragma once
 #include <cstring>
 #include <iostream>
+#include <cmath>
 #include <fstream>
 #include <cassert>
 
@@ -41,15 +42,6 @@ public:
 		delete[] bytes;
 		bytes = newBuf;
 		return *this;
-	}
-	void setBit(int i, bool status) {
-		if (i >= size * 8) {
-			throw std::exception("error");
-		}
-		bytes[i / 8] |= 1 << (i % 8);
-		if(!status){
-			bytes[i / 8] -= (1 << (i % 8));
-		}
 	}
 	inline byteArray(byteArray&& r) noexcept {
 		bytes = r.bytes;
@@ -160,7 +152,7 @@ public:
 		this->pixelBuf.bytes = new char[this->pixelBuf.size]();
 		iLoveColorTable(colors, size);
 	}
-	void setPixel([[maybe_unused]] int x, [[maybe_unused]] int y, [[maybe_unused]] int colorIndex);
+	[[maybe_unused]] void setPixel(int x, int y, int colorIndex);
     [[maybe_unused]] void setPixel(int x, int y, Color c);
 	void saveToFile([[maybe_unused]] const char* filename);
 private:
@@ -216,7 +208,7 @@ template<>
 void bitMapImage<32>::iLoveColorTable([[maybe_unused]] Color* colors, [[maybe_unused]] int size) {
 	this->colorTbl = byteArray(4, 0x00FF0000) + byteArray(4, static_cast<int>(0xFF000000)) + byteArray(4, 0x0000FF00);
 	this->bfOffBits = byteArray(4, 66);
-	this->bfSize = byteArray(4, 66 + static_cast<int>(ceil((double)this->w * (double)this->h * (static_cast<double>(32) / 8))) + this->koef);
+	this->bfSize = byteArray(4, 66 + static_cast<int>(ceil(this->w * this->h * (static_cast<double>(32) / 8))) + this->koef);
 }
 
 template<>
@@ -242,7 +234,7 @@ template<>
 void bitMapImage<24>::iLoveColorTable([[maybe_unused]] Color* colors,[[maybe_unused]] int size) {
 	this->colorTbl = byteArray();
 	this->bfOffBits = byteArray(4, 54);
-	this->bfSize = byteArray(4, 54 + static_cast<int>(ceil((double)this->w * (double)this->h * (static_cast<double>(24) / 8))) + this->koef);
+	this->bfSize = byteArray(4, 54 + static_cast<int>(ceil(this->w * this->h * (static_cast<double>(24) / 8))) + this->koef);
 }
 
 template<>
@@ -275,7 +267,7 @@ template<>
 void bitMapImage<16>::iLoveColorTable([[maybe_unused]] Color* colors, [[maybe_unused]] int size) {
 	this->colorTbl = byteArray(4, 0b0000011111100000) + byteArray(4, 0b1111100000000000) + byteArray(4, 0b0000000000011111);
 	this->bfOffBits = byteArray(4, 66);
-	this->bfSize = byteArray(4, 66 + static_cast<int>(ceil((double)this->w * (double)this->h * (static_cast<double>(16) / 8))) + this->koef);
+	this->bfSize = byteArray(4, 66 + static_cast<int>(ceil(this->w * this->h * (static_cast<double>(16) / 8))) + this->koef);
 }
 
 template<>
