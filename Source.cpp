@@ -2,6 +2,7 @@
 #include <cmath>
 #include <iostream>
 #include <vector>
+#include <string>
 #include <algorithm>
 #include "Vector3.hpp"
 #include "kdTree.hpp"
@@ -20,6 +21,7 @@ public:
 		this->R = R;
 		this->col = col;
 		this->specularity = spec;
+		updateBoundingBox();
 	}
 	bool intersect(double A, double B, double C, double xc, double yc, double zc, double& ans, bool& isKas) override {
 		double d1 = ((x0-xc) * A / B + (y0-yc) + (z0-zc) * C / B) * ((x0-xc) * A / B + (y0-yc) + (z0-zc) * C / B) - (A * A / (B * B) + 1 + C * C / (B * B)) * ((x0-xc) * (x0-xc) + (y0-yc) * (y0-yc) + (z0-zc) * (z0-zc) - R * R);
@@ -75,6 +77,7 @@ public:
 		Cp = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
 		Dp = -Ap * x0 - Bp * y0 - Cp * z0;
 		this->specularity = spec;
+		updateBoundingBox();
 	}
 	bool intersect(double A, double B, double C, double xc, double yc, double zc, double& ans, bool& isKas) override {
 		double yo = (yc * (A * Ap / B + Bp + C * Cp / B) - xc * Ap - zc * Cp - Dp) / (A * Ap / B + Bp + C * Cp / B);
@@ -121,11 +124,11 @@ bool sortO(Object* a, Object* b) {
 }
 
 int main() {
-	cout << "Please enter desired FOV>";
+	std::cout << "Please enter desired FOV>";
 	double fov;
 	int x, y;
 	cin >> fov;
-	cout << "Please enter Window size:>";
+	std::cout << "Please enter Window size:>";
 	cin >> x >> y;
 	if (x % 2 != 0) {
 		x++;
@@ -142,13 +145,46 @@ int main() {
 	objs.push_back(new Polygon(-200.0,ekrY + 400,-100.0, -300.0, ekrY + 400, 400.0, 100.0, ekrY + 400, 400.0, Color(255,0,0),10));
 	objs.push_back(new Polygon(-200.0,ekrY + 10,0.0, -300.0, ekrY * 2 + 800, 700.0, 100.0, ekrY * 2 + 800, 700.0, Color(255,0,0),10));
 
+	/*ifstream in("cube.obj");
+	vector<Vector3> vertices;
+	while (!in.eof()) {
+		char sym;
+		double t1;
+		double t2;
+		double t3;
+		in >> sym;
+		if (sym == 'v') {
+			in >> t1 >> t2 >> t3;
+			vertices.emplace_back(t1, t2+700, t3);
+		}
+		else if (sym == 'f') {
+			in >> t1 >> t2 >> t3;
+			objs.push_back(new Polygon(vertices[t1 - 1].x, vertices[t1 - 1].y, vertices[t1 - 1].z, vertices[t2 - 1].x, vertices[t2 - 1].y, vertices[t2 - 1].z, vertices[t3 - 1].x, vertices[t3 - 1].y, vertices[t3 - 1].z));
+		}
+	}
+	vertices.clear();
+	cout << "load complete" << endl;*/
 	sort(objs.begin(), objs.end(), sortO);
 	std::vector<std::vector<double>> depthBuffer(y, std::vector<double>(x, std::numeric_limits<double>::infinity()));
+
+	Vector3 lower;
+	Vector3 upper;
+	for (auto o : objs) {
+		lower.x = std::min(o->bbox[0].x, lower.x);
+		lower.y = std::min(o->bbox[0].y, lower.y);
+		lower.z = std::min(o->bbox[0].z, lower.z);
+		upper.x = std::max(o->bbox[1].x, upper.x);
+		upper.y = std::max(o->bbox[1].y, upper.y);
+		upper.z = std::max(o->bbox[1].z, upper.z);
+	}
+
+	kdTree tree(lower,upper,Vector3(1,0,0),objs);
 
 	for (int i = -y / 2; i < y / 2; i++) {
 		for (int j = -x / 2; j < x / 2; j++) {
 			bool pixelSet = false;
-			for (auto o : objs) {
+			auto curStep = tree.getObj(Vector3(j, ekrY, i));
+			for (auto o : curStep) {
 				double& depthNow = depthBuffer[i + y / 2][j + x / 2];
 				double yx;
 				bool isKas;
