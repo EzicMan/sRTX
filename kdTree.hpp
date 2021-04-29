@@ -27,7 +27,7 @@
 
 class Object;
 
-constexpr size_t POINT_OF_NO_RETURN = 4;
+constexpr double SIZE_OF_NO_RETURN = 0.5;
 
 class kdTree{
     std::unique_ptr<kdTree> sides[2];
@@ -50,7 +50,8 @@ public:
             if(no) continue;
             container.push_back(obj);
         }
-        if(container.size() < POINT_OF_NO_RETURN) {
+        double debug = (upperPoint - lowerPoint).length();
+        if((upperPoint - lowerPoint).length() < SIZE_OF_NO_RETURN) {
             sides[0] = nullptr;
             sides[1] = nullptr;
             return;
@@ -72,14 +73,19 @@ public:
                                              container);
     }
 
-    std::vector<Object*> getObj(Vector3 ray){
+    void getObj(Vector3 ray, std::set<Object *>& set){
         if(sides[0] == nullptr || sides[1] == nullptr){
-            return objs;
+            for (auto k : container) {
+                set.insert(k);
+            }
+            return;
         }
         if(ray*n == 0 && dist >= 0) {
-            return sides[0]->getObj(ray);
+            sides[0]->getObj(ray,set);
+            return;
         }else if(ray*n == 0 && dist < 0){
-            return sides[1]->getObj(ray);
+            sides[1]->getObj(ray, set);
+            return;
         }
         Vector3 a = ray * (dist / (ray*n));
         bool no1 = false;
@@ -92,19 +98,18 @@ public:
                 no2 = true;
             }
         }
+        if (no1 && no2) {
+            return;
+        }
         if(no1){
-            return sides[1]->getObj(ray);
+            sides[1]->getObj(ray, set);
+            return;
         }
         if(no2){
-            return sides[0]->getObj(ray);
+            sides[0]->getObj(ray, set);
+            return;
         }
-        std::vector<Object*> b;
-        std::vector<Object*> ret1 = sides[0]->getObj(ray);
-        std::copy(ret1.begin(),ret1.end(),b.begin());
-        std::vector<Object*> ret2 = sides[1]->getObj(ray);
-        for(auto k : ret2){
-            b.push_back(k);
-        }
-        return b;
+        sides[0]->getObj(ray,set);
+        sides[1]->getObj(ray,set);
     }
 };
