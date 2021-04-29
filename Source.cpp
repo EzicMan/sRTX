@@ -80,9 +80,13 @@ public:
 		updateBoundingBox();
 	}
 	bool intersect(double A, double B, double C, double xc, double yc, double zc, double& ans, bool& isKas) override {
-		double yo = (yc * (A * Ap / B + Bp + C * Cp / B) - xc * Ap - zc * Cp - Dp) / (A * Ap / B + Bp + C * Cp / B);
-		double xo = (yo - yc) * A / B + xc;
-		double zo = (yo - yc) * C / B + zc;
+		//double yo = (yc * (A * Ap / B + Bp + C * Cp / B) - xc * Ap - zc * Cp - Dp) / (A * Ap / B + Bp + C * Cp / B);
+		//double xo = (yo - yc) * A / B + xc;
+		//double zo = (yo - yc) * C / B + zc;
+		double t = -Dp / (Ap * A + Bp * B + Cp * C);
+		double xo = A * t;
+		double yo = B * t;
+		double zo = C * t;
 		Vector3 o(xo, yo, zo);
 		Vector3 a(x0, y0, z0);
 		Vector3 b(x1, y1, z1);
@@ -144,7 +148,7 @@ int main() {
 	objs.push_back(new Sphere(400, ekrY - 300, 0, 75, Color(0,255,0),10));
 	objs.push_back(new Polygon(-200.0,ekrY + 400,-100.0, -300.0, ekrY + 400, 400.0, 100.0, ekrY + 400, 400.0, Color(255,0,0),10));
 	objs.push_back(new Polygon(-200.0,ekrY + 10,0.0, -300.0, ekrY * 2 + 800, 700.0, 100.0, ekrY * 2 + 800, 700.0, Color(255,0,0),10));
-
+	
 	/*ifstream in("cube.obj");
 	vector<Vector3> vertices;
 	while (!in.eof()) {
@@ -155,7 +159,7 @@ int main() {
 		in >> sym;
 		if (sym == 'v') {
 			in >> t1 >> t2 >> t3;
-			vertices.emplace_back(t1, t2+700, t3);
+			vertices.emplace_back(t1, t2, t3);
 		}
 		else if (sym == 'f') {
 			in >> t1 >> t2 >> t3;
@@ -178,18 +182,17 @@ int main() {
 		upper.z = std::max(o->bbox[1].z, upper.z);
 	}
 
-	kdTree tree(lower,upper,Vector3(1,0,0),objs);
+	//kdTree tree(lower,upper,Vector3(1,0,0),objs);
 
 	for (int i = -y / 2; i < y / 2; i++) {
 		for (int j = -x / 2; j < x / 2; j++) {
 			bool pixelSet = false;
-			auto curStep = tree.getObj(Vector3(j, ekrY, i));
-			for (auto o : curStep) {
+			//auto curStep = tree.getObj(Vector3(j, ekrY, i));
+			for (auto o : objs) {
 				double& depthNow = depthBuffer[i + y / 2][j + x / 2];
 				double yx;
 				bool isKas;
 				if (o->intersect(j, ekrY, i, 0, 0, 0, yx, isKas)) {
-
 					if (yx > depthNow) {
 						continue;
 					}
@@ -197,6 +200,9 @@ int main() {
 					depthNow = yx;
 
 					Color c = o->pixelColorCustoms(static_cast<double>(j) * yx / ekrY, yx, static_cast<double>(i) * yx / ekrY);
+
+					//printf("%d %d %d\n",c.red,c.green,c.blue);
+
 					im.setPixel(x / 2 + j, y / 2 + i, c);
 					pixelSet = true;
 				}
