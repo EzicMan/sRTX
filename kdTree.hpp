@@ -65,7 +65,7 @@ public:
                                                      n[2] == 1 ? dist : upperPoint[2]),
                                              Vector3(n[2],n[0],n[1]),
                                              container);
-        sides[1] = std::make_unique<kdTree>(Vector3(n[0] == 1 ? dist : lowerPoint[0],
+        sides[1] = std::make_unique<kdTree>( Vector3(n[0] == 1 ? dist : lowerPoint[0],
                                                      n[1] == 1 ? dist : lowerPoint[1],
                                                      n[2] == 1 ? dist : lowerPoint[2]),
                                              upperPoint,
@@ -80,36 +80,98 @@ public:
             }
             return;
         }
-        if(ray*n == 0 && dist >= 0) {
-            sides[0]->getObj(ray,set);
-            return;
-        }else if(ray*n == 0 && dist < 0){
-            sides[1]->getObj(ray, set);
-            return;
-        }
-        Vector3 a = ray * (dist / (ray*n));
-        bool no1 = false;
-        bool no2 = false;
-        for(int i = 0; i < 3; i++){
-            if(a[i] < sides[0]->bbox[0][i] || a[i] > sides[0]->bbox[1][i]){
-                no1 = true;
+        double toSurface = (dist / (ray * n));
+        double koef1 = 0;
+        double koef2 = 0;
+        Vector3 temp;
+        //x
+        for (int i = 0; i < 2; i++) {
+            double x1 = (bbox[i].x / ray.x);
+            if (x1 < 0) {
+                continue;
             }
-            if(a[i] < sides[1]->bbox[0][i] || a[i] > sides[1]->bbox[1][i]){
-                no2 = true;
+            temp = ray * x1;
+            if (temp.y >= bbox[0].y && temp.y <= bbox[1].y && temp.z >= bbox[0].z && temp.z <= bbox[1].z) {
+                if (koef1 == 0) {
+                    koef1 = x1;
+                }
+                else if (koef2 == 0) {
+                    koef2 = x1;
+                }
             }
         }
-        if (no1 && no2) {
-            return;
+        //y
+        for (int i = 0; i < 2; i++) {
+            if (koef2 != 0) {
+                break;
+            }
+            double x1 = (bbox[i].y / ray.y);
+            if (x1 < 0) {
+                continue;
+            }
+            temp = ray * x1;
+            if (temp.x >= bbox[0].x && temp.x <= bbox[1].x && temp.z >= bbox[0].z && temp.z <= bbox[1].z) {
+                if (koef1 == 0) {
+                    koef1 = x1;
+                }
+                else if (koef2 == 0) {
+                    koef2 = x1;
+                }
+            }
         }
-        if(no1){
-            sides[1]->getObj(ray, set);
-            return;
+        //z
+        for (int i = 0; i < 2; i++) {
+            if (koef2 != 0) {
+                break;
+            }
+            double x1 = (bbox[i].z / ray.z);
+            if (x1 < 0) {
+                continue;
+            }
+            temp = ray * x1;
+            if (temp.x >= bbox[0].x && temp.x <= bbox[1].x && temp.y >= bbox[0].y && temp.y <= bbox[1].y) {
+                if (koef1 == 0) {
+                    koef1 = x1;
+                }
+                else if (koef2 == 0) {
+                    koef2 = x1;
+                }
+            }
         }
-        if(no2){
+
+
+        if (koef1 > koef2) {
+            std::swap(koef1, koef2);
+        }
+
+        if (toSurface > koef2) {
             sides[0]->getObj(ray, set);
+        }
+        else if (toSurface < koef1) {
+            sides[1]->getObj(ray, set);
+        }
+        else {
+            sides[0]->getObj(ray, set);
+            sides[1]->getObj(ray, set);
+        }
+    }
+
+    void dump(std::ofstream& out, int glub) {
+        out << glub << " ";
+        for (int i = 0; i < 3; i++) {
+            out << bbox[0][i] << " ";
+        }
+        for (int i = 0; i < 3; i++) {
+            out << bbox[1][i] << " ";
+        }
+        for (int i = 0; i < 3; i++) {
+            out << n[i] << " ";
+        }
+        out << dist << endl;
+        if (sides[0] == nullptr) {
             return;
         }
-        sides[0]->getObj(ray,set);
-        sides[1]->getObj(ray,set);
+        sides[0]->dump(out, glub+1);
+        sides[1]->dump(out, glub+1);
     }
 };

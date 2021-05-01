@@ -164,7 +164,7 @@ int main() {
 		in >> sym;
 		if (sym == 'v') {
 			in >> t1 >> t2 >> t3;
-			vertices.emplace_back(t1 - 10, t2 + 20, t3);
+			vertices.emplace_back(t1 - 10, t2 + 20, t3 - 5);
 		}
 		else if (sym == 'f') {
 			in >> t1 >> t2 >> t3;
@@ -188,6 +188,11 @@ int main() {
 	}
 
 	kdTree tree(lower,upper,Vector3(1,0,0),objs);
+	
+	std::ofstream out("tree.txt");
+	tree.dump(out, 0);
+	out.close();
+
 	std::set<Object*> curStep;
 	for (int i = -y / 2; i < y / 2; i++) {
 		for (int j = -x / 2; j < x / 2; j++) {
@@ -217,6 +222,7 @@ int main() {
 				im.setPixel(x / 2 + j, y / 2 + i, Color(0, 0, 0));
 			}
 		}
+		cout << (i + y / 2) << " / " << y << "\n";
 	}
 	im.saveToFile("test.bmp");
 	cout << count1 << endl;
