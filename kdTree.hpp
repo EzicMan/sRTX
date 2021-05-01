@@ -167,7 +167,7 @@ public:
         for (int i = 0; i < 3; i++) {
             out << n[i] << " ";
         }
-        out << dist << endl;
+        out << dist << std::endl;
         if (sides[0] == nullptr) {
             return;
         }
