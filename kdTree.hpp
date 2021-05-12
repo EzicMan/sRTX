@@ -51,7 +51,7 @@ public:
             container.push_back(obj);
         }
         double debug = (upperPoint - lowerPoint).length();
-        if((upperPoint - lowerPoint).length() < SIZE_OF_NO_RETURN) {
+        if((upperPoint - lowerPoint).length() < SIZE_OF_NO_RETURN || container.size() < 4) {
             sides[0] = nullptr;
             sides[1] = nullptr;
             return;
@@ -74,11 +74,18 @@ public:
     }
 
     void getObj(Vector3 ray, std::set<Object *>& set){
-        if(sides[0] == nullptr || sides[1] == nullptr){
+        if(sides[0] == nullptr || sides[1] == nullptr) {
             for (auto k : container) {
                 set.insert(k);
             }
             return;
+        }
+        if(ray * n == 0){
+            if(dist >= 0 && bbox[0].x <= 0){
+                sides[0]->getObj(ray, set);
+            }else if(dist >= 0 && bbox[1].x >= 0){
+                sides[1]->getObj(ray, set);
+            }
         }
         double toSurface = (dist / (ray * n));
         double koef1 = 0;
@@ -86,6 +93,12 @@ public:
         Vector3 temp;
         //x
         for (int i = 0; i < 2; i++) {
+            if(ray.x == 0){
+                if(bbox[0].x * bbox[1].x > 0){
+                    return;
+                }
+                break;
+            }
             double x1 = (bbox[i].x / ray.x);
             if (x1 < 0) {
                 continue;
@@ -102,6 +115,12 @@ public:
         }
         //y
         for (int i = 0; i < 2; i++) {
+            if(ray.y == 0){
+                if(bbox[0].y * bbox[1].y > 0){
+                    return;
+                }
+                break;
+            }
             if (koef2 != 0) {
                 break;
             }
@@ -121,6 +140,12 @@ public:
         }
         //z
         for (int i = 0; i < 2; i++) {
+            if(ray.z == 0){
+                if(bbox[0].z * bbox[1].z > 0){
+                    return;
+                }
+                break;
+            }
             if (koef2 != 0) {
                 break;
             }
@@ -142,6 +167,10 @@ public:
 
         if (koef1 > koef2) {
             std::swap(koef1, koef2);
+        }
+
+        if(koef2 == 0 || koef1 == 0){
+            return;
         }
 
         if (toSurface > koef2) {
