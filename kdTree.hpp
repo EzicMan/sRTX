@@ -32,7 +32,7 @@ constexpr double SIZE_OF_NO_RETURN = 0.5;
 class kdTree{
     std::unique_ptr<kdTree> sides[2];
     Vector3 n;
-    double dist;
+    double dist = 0;
     Vector3 bbox[2];
     std::vector<Object*> container;
 public:

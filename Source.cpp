@@ -149,14 +149,14 @@ int main() {
 	bitMapImage<24> im(x, y);
 	double ekrY = sqrt(static_cast<double>((double)x * (double)x) / (2 * (1 - cos(fov / 180 * PI))) - static_cast<double>((double)x * (double)x) / 4);
 	yl = ekrY - 200;
-	objs.push_back(new Sphere(-800, ekrY + 100, 0, 200,Color(255),10));
-    objs.push_back(new Sphere(0, ekrY + 100, 0, 200,Color(255,255,0),10));
-	objs.push_back(new Sphere(-420, ekrY - 32.5, 0, 75, Color(0,0,255),10));
-	objs.push_back(new Sphere(400, ekrY - 300, 0, 75, Color(0,255,0),10));
-	objs.push_back(new Polygon(-200.0,ekrY + 400,-100.0, -300.0, ekrY + 400, 400.0, 100.0, ekrY + 400, 400.0, Color(255,0,0),10));
-	objs.push_back(new Polygon(-200.0,ekrY + 10,0.0, -300.0, ekrY * 2 + 800, 700.0, 100.0, ekrY * 2 + 800, 700.0, Color(255,0,0),10));
+	//objs.push_back(new Sphere(-800, ekrY + 100, 0, 200,Color(255),10));
+    //objs.push_back(new Sphere(0, ekrY + 100, 0, 200,Color(255,255,0),10));
+	//objs.push_back(new Sphere(-420, ekrY - 32.5, 0, 75, Color(0,0,255),10));
+	//objs.push_back(new Sphere(400, ekrY - 300, 0, 75, Color(0,255,0),10));
+	//objs.push_back(new Polygon(-200.0,ekrY + 400,-100.0, -300.0, ekrY + 400, 400.0, 100.0, ekrY + 400, 400.0, Color(255,0,0),10));
+	//objs.push_back(new Polygon(-200.0,ekrY + 10,0.0, -300.0, ekrY * 2 + 800, 700.0, 100.0, ekrY * 2 + 800, 700.0, Color(255,0,0),10));
 	
-	/*ifstream in("cube.obj");
+	ifstream in("cube.obj");
 	vector<Vector3> vertices;
 	while (!in.eof()) {
 		char sym;
@@ -166,14 +166,14 @@ int main() {
 		in >> sym;
 		if (sym == 'v') {
 			in >> t1 >> t2 >> t3;
-			vertices.emplace_back(t1 - 10, t2 + 20, t3 - 5);
+			vertices.emplace_back(t1-10, t2 + 30, t3);
 		}
 		else if (sym == 'f') {
 			in >> t1 >> t2 >> t3;
-			objs.push_back(new Polygon(vertices[t1 - 1].x, vertices[t1 - 1].y, vertices[t1 - 1].z, vertices[t2 - 1].x, vertices[t2 - 1].y, vertices[t2 - 1].z, vertices[t3 - 1].x, vertices[t3 - 1].y, vertices[t3 - 1].z,Color(255,0,0),6));
+			objs.push_back(new Polygon(vertices[t1 - 1].x, vertices[t1 - 1].y, vertices[t1 - 1].z, vertices[t2 - 1].x, vertices[t2 - 1].y, vertices[t2 - 1].z, vertices[t3 - 1].x, vertices[t3 - 1].y, vertices[t3 - 1].z,Color(255,0,0),100));
 		}
 	}
-	vertices.clear();*/
+	vertices.clear();
 	cout << "load complete" << endl;
 	sort(objs.begin(), objs.end(), sortO);
 	std::vector<std::vector<double>> depthBuffer(y, std::vector<double>(x, std::numeric_limits<double>::infinity()));
@@ -189,20 +189,21 @@ int main() {
 		upper.z = std::max(o->bbox[1].z, upper.z);
 	}
 
-	kdTree tree(lower,upper,Vector3(1,0,0),objs);
+	//kdTree tree(lower,upper,Vector3(1,0,0),objs);
 	
 	//std::ofstream out("tree.txt");
 	//tree.dump(out, 0);
 	//out.close();
 
-	std::set<Object*> curStep;
+#pragma omp parallel for
 	for (int i = -y / 2; i < y / 2; i++) {
+#pragma omp parallel for
 		for (int j = -x / 2; j < x / 2; j++) {
 			bool pixelSet = false;
-			curStep.clear();
-			tree.getObj(Vector3(j, ekrY, i), curStep);
-			for(auto o : curStep){
-			//for (auto o : objs) {
+			//std::set<Object*> curStep;
+			//tree.getObj(Vector3(j, ekrY, i), curStep);
+			//for(auto o : curStep){
+			for (auto o : objs) {
 				double& depthNow = depthBuffer[i + y / 2][j + x / 2];
 				double yx;
 				bool isKas;
@@ -225,7 +226,7 @@ int main() {
 				im.setPixel(x / 2 + j, y / 2 + i, Color(0, 0, 0));
 			}
 		}
-		cout << (i + y / 2) << " / " << y << "\n";
+		//cout << (i + y / 2) << " / " << y << "\n";
 	}
 	im.saveToFile("test.bmp");
 	cout << count1 << endl;
