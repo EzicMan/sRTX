@@ -6,10 +6,12 @@
 #include <algorithm>
 #include <set>
 #include <float.h>
+#include "json.hpp"
 #include "Vector3.hpp"
 #include "kdTree.hpp"
 #include "Object.hpp"
 using namespace std;
+using nlohmann::json;
 
 #define PI 3.1415926
 
@@ -46,7 +48,7 @@ public:
 	Color pixelColorCustoms(double x, double y, double z) override {
 		Vector3 n(2 * (x - x0), 2 * (y - y0), 2 * (z - z0));
 		n = n.normalize();
-		return pixelColor(x, y, z, n);
+		return pixelColor(x, y, z, n, false);
 	}
 	void updateBoundingBox() override {
 	    bbox[0].x = x0 - R;
@@ -112,11 +114,7 @@ public:
 	Color pixelColorCustoms(double x, double y, double z) override {
 		Vector3 n(Ap, Bp, Cp);
 		n = n.normalize();
-		Vector3 a(xl - x, yl - y, zl - z);
-		if (a * n < 0) {
-			n = -n;
-		}
-		return pixelColor(x, y, z, n);
+		return pixelColor(x, y, z, n, true);
 	}
 
     void updateBoundingBox() override {
@@ -148,32 +146,62 @@ int main() {
 	}
 	bitMapImage<24> im(x, y);
 	double ekrY = sqrt(static_cast<double>((double)x * (double)x) / (2 * (1 - cos(fov / 180 * PI))) - static_cast<double>((double)x * (double)x) / 4);
-	yl = ekrY - 200;
-	//objs.push_back(new Sphere(-800, ekrY + 100, 0, 200,Color(255),10));
-    //objs.push_back(new Sphere(0, ekrY + 100, 0, 200,Color(255,255,0),10));
-	//objs.push_back(new Sphere(-420, ekrY - 32.5, 0, 75, Color(0,0,255),10));
-	//objs.push_back(new Sphere(400, ekrY - 300, 0, 75, Color(0,255,0),10));
-	//objs.push_back(new Polygon(-200.0,ekrY + 400,-100.0, -300.0, ekrY + 400, 400.0, 100.0, ekrY + 400, 400.0, Color(255,0,0),10));
-	//objs.push_back(new Polygon(-200.0,ekrY + 10,0.0, -300.0, ekrY * 2 + 800, 700.0, 100.0, ekrY * 2 + 800, 700.0, Color(255,0,0),10));
-	
-	ifstream in("cube.obj");
-	vector<Vector3> vertices;
-	while (!in.eof()) {
-		char sym;
-		double t1;
-		double t2;
-		double t3;
-		in >> sym;
-		if (sym == 'v') {
-			in >> t1 >> t2 >> t3;
-			vertices.emplace_back(t1-10, t2 + 30, t3);
+
+	std::ifstream i("config.json");
+	json js;
+	i >> js;
+	i.close();
+
+	for (auto it : js["lights"]) {
+		lights.push_back(Light(it["lightcoords"][0], it["lightcoords"][1] + (it["relative"] ? ekrY : 0), it["lightcoords"][2],it["intensity"]));
+	}
+
+	for (auto it : js["objects"]) {
+		if (it["name"] == "Sphere") {
+			objs.push_back(new Sphere(it["coords"][0], it["coords"][1] + (it["relative"] ? ekrY : 0), it["coords"][2], it["r"], Color(it["col"][0], it["col"][1], it["col"][2]), it["spec"]));
 		}
-		else if (sym == 'f') {
-			in >> t1 >> t2 >> t3;
-			objs.push_back(new Polygon(vertices[t1 - 1].x, vertices[t1 - 1].y, vertices[t1 - 1].z, vertices[t2 - 1].x, vertices[t2 - 1].y, vertices[t2 - 1].z, vertices[t3 - 1].x, vertices[t3 - 1].y, vertices[t3 - 1].z,Color(255,0,0),100));
+		else if (it["name"] == "Polygon") {
+			objs.push_back(new Polygon(it["coords1"][0], it["coords1"][1] + (it["relative"] ? ekrY : 0), it["coords1"][2], it["coords2"][0], it["coords2"][1] + (it["relative"] ? ekrY : 0), it["coords2"][2], it["coords3"][0], it["coords3"][1] + (it["relative"] ? ekrY : 0), it["coords3"][2], Color(it["col"][0], it["col"][1], it["col"][2]), it["spec"]));
+		}
+		else {
+			ifstream in(std::string(it["file"]).c_str());
+			vector<Vector3> vertices;
+			double p = it["euler"][0];
+			double t = it["euler"][1];
+			double s = it["euler"][2];
+			double neo[3][3] = { {cos(p)*cos(s) - sin(p)*cos(t)*sin(s), -cos(p)*sin(s)-sin(p)*cos(t)*cos(s), sin(p)*sin(t)}, {sin(p) * cos(s) - cos(p) * cos(t) * sin(s), -sin(p) * sin(s) + cos(p) * cos(t) * cos(s), -cos(p) * sin(t)}, {sin(t)*sin(s), sin(t)*cos(s), cos(t)} };
+			while (!in.eof()) {
+				char sym;
+				double t1;
+				double t2;
+				double t3;
+				Vector3 beforeeu;
+				Vector3 aftereu;
+				in >> sym;
+				if (sym == 'v') {
+					in >> beforeeu[0] >> beforeeu[1] >> beforeeu[2];
+					for (int i = 0; i < 3; i++) {
+						for (int k = 0; k < 3; k++) {
+							aftereu[i] += beforeeu[k] * neo[i][k];
+						}
+					}
+					aftereu[0] += it["coords"][0];
+					aftereu[1] += it["coords"][1] + (it["relative"] ? ekrY : 0);
+					aftereu[2] += it["coords"][2];
+					vertices.emplace_back(aftereu[0], aftereu[1], aftereu[2]);
+				}
+				else if (sym == 'f') {
+					in >> t1 >> t2 >> t3;
+					if (t1 == 0 || t2 == 0 || t3 == 0) {
+						break;
+					}
+					objs.push_back(new Polygon(vertices[t1 - 1].x, vertices[t1 - 1].y, vertices[t1 - 1].z, vertices[t2 - 1].x, vertices[t2 - 1].y, vertices[t2 - 1].z, vertices[t3 - 1].x, vertices[t3 - 1].y, vertices[t3 - 1].z, Color(it["col"][0], it["col"][1], it["col"][2]), it["spec"]));
+				}
+			}
+			vertices.clear();
 		}
 	}
-	vertices.clear();
+
 	cout << "load complete" << endl;
 	sort(objs.begin(), objs.end(), sortO);
 	std::vector<std::vector<double>> depthBuffer(y, std::vector<double>(x, std::numeric_limits<double>::infinity()));
@@ -223,7 +251,7 @@ int main() {
 				}
 			}
 			if (!pixelSet) {
-				im.setPixel(x / 2 + j, y / 2 + i, Color(0, 0, 0));
+				im.setPixel(x / 2 + j, y / 2 + i, Color(js["backgroundColor"][0], js["backgroundColor"][1], js["backgroundColor"][2]));
 			}
 		}
 		//cout << (i + y / 2) << " / " << y << "\n";
