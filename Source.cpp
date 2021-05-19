@@ -132,12 +132,18 @@ bool sortO(Object* a, Object* b) {
 }
 
 int main() {
-	std::cout << "Please enter desired FOV>";
 	double fov;
 	int x, y;
-	cin >> fov;
-	std::cout << "Please enter Window size:>";
-	cin >> x >> y;
+
+	std::ifstream i("config.json");
+	json js;
+	i >> js;
+	i.close();
+
+	fov = js["fov"];
+	x = js["resolution"][0];
+	y = js["resolution"][1];
+
 	if (x % 2 != 0) {
 		x++;
 	}
@@ -146,11 +152,6 @@ int main() {
 	}
 	bitMapImage<24> im(x, y);
 	double ekrY = sqrt(static_cast<double>((double)x * (double)x) / (2 * (1 - cos(fov / 180 * PI))) - static_cast<double>((double)x * (double)x) / 4);
-
-	std::ifstream i("config.json");
-	json js;
-	i >> js;
-	i.close();
 
 	for (auto it : js["lights"]) {
 		lights.push_back(Light(it["lightcoords"][0], it["lightcoords"][1] + (it["relative"] ? ekrY : 0), it["lightcoords"][2],it["intensity"]));
