@@ -2,6 +2,7 @@
     "backgroundColor": [0,0,0],
     "fov": 90,
     "resolution": [2000, 500],
+    "output": "test.bmp",
     "lights":[
         {
             "relative": true,

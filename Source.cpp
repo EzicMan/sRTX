@@ -257,6 +257,9 @@ int main() {
 		}
 		//cout << (i + y / 2) << " / " << y << "\n";
 	}
-	im.saveToFile("test.bmp");
+	for (auto i : objs) {
+		free(i);
+	}
+	im.saveToFile(std::string(js["output"]).c_str());
 	cout << count1 << endl;
 }
